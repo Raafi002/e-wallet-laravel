@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>E-Wallet Demo – UTS IAE/EAI</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f5f5f5;
+      margin: 0;
+      padding: 0;
+    }
+    header {
+      background: #1f2937;
+      color: #fff;
+      padding: 1rem 2rem;
+    }
+    header h1 {
+      margin: 0;
+      font-size: 1.4rem;
+    }
+    main {
+      padding: 1.5rem 2rem;
+      display: grid;
+      grid-template-columns: 1.5fr 1.5fr 1.5fr;
+      gap: 1rem;
+    }
+    @media (max-width: 900px) {
+      main {
+        grid-template-columns: 1fr;
+      }
+    }
+    .card {
+      background: #fff;
+      border-radius: 8px;
+      padding: 1rem;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.08);
+    }
+    .card h2 {
+      margin-top: 0;
+      font-size: 1.1rem;
+      border-bottom: 1px solid #eee;
+      padding-bottom: .5rem;
+      margin-bottom: .75rem;
+    }
+    label {
+      font-size: 0.85rem;
+      display: block;
+      margin-top: 0.5rem;
+    }
+    input, select {
+      width: 100%;
+      padding: 0.4rem 0.5rem;
+      margin-top: 0.2rem;
+      border-radius: 4px;
+      border: 1px solid #ccc;
+      font-size: 0.9rem;
+      box-sizing: border-box;
+    }
+    button {
+      margin-top: 0.6rem;
+      padding: 0.45rem 0.8rem;
+      border-radius: 4px;
+      border: none;
+      background: #2563eb;
+      color: #fff;
+      font-size: 0.9rem;
+      cursor: pointer;
+    }
+    button.secondary {
+      background: #6b7280;
+    }
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    .small {
+      font-size: 0.8rem;
+      color: #555;
+    }
+    .list {
+      max-height: 260px;
+      overflow-y: auto;
+      border: 1px solid #eee;
+      border-radius: 4px;
+      padding: 0.4rem;
+      font-size: 0.85rem;
+      background: #fafafa;
+    }
+    .user-item {
+      padding: 0.3rem 0.4rem;
+      border-bottom: 1px solid #eee;
+      cursor: pointer;
+    }
+    .user-item:last-child {
+      border-bottom: none;
+    }
+    .user-item.active {
+      background: #dbeafe;
+    }
+    .status {
+      margin-top: 0.5rem;
+      font-size: 0.8rem;
+      min-height: 1rem;
+    }
+    .status.ok {
+      color: #16a34a;
+    }
+    .status.error {
+      color: #dc2626;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.8rem;
+    }
+    th, td {
+      border: 1px solid #eee;
+      padding: 0.3rem 0.4rem;
+      text-align: left;
+    }
+    th {
+      background: #f3f4f6;
+    }
+    .badge {
+      display: inline-block;
+      padding: 0.15rem 0.45rem;
+      border-radius: 999px;
+      font-size: 0.7rem;
+      color: #fff;
+    }
+    .badge.topup { background: #16a34a; }
+    .badge.payment { background: #dc2626; }
+    .last-updated {
+      font-size: 0.75rem;
+      color: #6b7280;
+      margin-top: 0.25rem;
+    }
+  </style>
+</head>
+<body>
+<header>
+  <h1>E-Wallet – Digital Payment Service (User & Payment Service via API Gateway)</h1>
+</header>
+
+<main>
+  <!-- CARD 1: MANAGE USER -->
+  <section class="card">
+    <h2>1. Register User</h2>
+
+    <label>Nama Lengkap</label>
+    <input type="text" id="nameInput" placeholder="Budi">
+
+    <label>Email</label>
+    <input type="email" id="emailInput" placeholder="budi@example.com">
+
+    <label>PIN (4 digit)</label>
+    <input type="password" id="pinInput" maxlength="4" placeholder="1234">
+
+    <button onclick="createUser()">Simpan User</button>
+
+    <div class="status" id="userStatus"></div>
+
+    <hr>
+
+    <h2>2. Daftar User</h2>
+    <button class="secondary" onclick="loadUsers()">Refresh Daftar User</button>
+    <div class="last-updated">
+      Last updated: <span id="usersUpdatedAt">-</span>
+    </div>
+    <div class="small">Klik salah satu user untuk memilih.</div>
+
+    <div class="list" id="userList"></div>
+
+  </section>
+
+  <!-- CARD 2: BALANCE & TOPUP -->
+  <section class="card">
+    <h2>3. Saldo & Top Up</h2>
+
+    <p class="small">
+      User terpilih: <strong id="selectedUserLabel">Belum ada</strong><br>
+      Saldo saat ini: <strong id="balanceLabel">-</strong>
+    </p>
+
+    <button class="secondary" onclick="loadBalance()">Cek Saldo</button>
+
+    <label>Nominal Top Up</label>
+    <input type="number" id="topupAmount" min="1" placeholder="50000">
+
+    <button onclick="topup()">Top Up</button>
+
+    <div class="status" id="balanceStatus"></div>
+  </section>
+
+  <!-- CARD 3: PAYMENT & TRANSACTIONS -->
+  <section class="card">
+    <h2>4. Pembayaran</h2>
+
+    <label>Nominal Bayar</label>
+    <input type="number" id="payAmount" min="1" placeholder="20000">
+
+    <label>Merchant</label>
+    <input type="text" id="merchantInput" placeholder="Warung Makan Pak Dedi">
+
+    <label>Catatan (opsional)</label>
+    <input type="text" id="noteInput" placeholder="Makan siang">
+
+    <button onclick="pay()">Bayar</button>
+
+    <div class="status" id="payStatus"></div>
+
+    <hr>
+
+    <h2>5. Riwayat Transaksi</h2>
+    <button class="secondary" onclick="loadTransactions()">Refresh Transaksi</button>
+    <div class="last-updated">
+      Last updated: <span id="transactionsUpdatedAt">-</span>
+    </div>
+
+    <div class="list" style="margin-top:0.5rem;">
+      <table id="transactionsTable">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>User</th>
+            <th>Type</th>
+            <th>Amount</th>
+            <th>Desc</th>
+          </tr>
+        </thead>
+        <tbody>
+        <!-- rows diisi via JS -->
+        </tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<script>
+  const GATEWAY_BASE_URL = 'http://localhost:4000';
+
+  let selectedUser = null; // {id, name, email, balance}
+
+  function setStatus(id, message, ok = true) {
+    const el = document.getElementById(id);
+    el.textContent = message || '';
+    el.className = 'status ' + (message ? (ok ? 'ok' : 'error') : '');
+  }
+
+  function setLastUpdated(spanId) {
+    const el = document.getElementById(spanId);
+    const now = new Date();
+    el.textContent = now.toLocaleTimeString();
+  }
+
+  async function createUser() {
+    const name = document.getElementById('nameInput').value.trim();
+    const email = document.getElementById('emailInput').value.trim();
+    const pin = document.getElementById('pinInput').value.trim();
+
+    if (!name || !email || !pin) {
+      setStatus('userStatus', 'Nama, email, dan PIN wajib diisi.', false);
+      return;
+    }
+
+    try {
+      const resp = await fetch(`${GATEWAY_BASE_URL}/api/user-service/users`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email, pin })
+      });
+
+      const data = await resp.json();
+
+      if (!resp.ok) {
+        setStatus('userStatus', data.message || 'Gagal membuat user.', false);
+        return;
+      }
+
+      setStatus('userStatus', `User "${data.name}" berhasil dibuat (ID: ${data.id}).`, true);
+      document.getElementById('nameInput').value = '';
+      document.getElementById('emailInput').value = '';
+      document.getElementById('pinInput').value = '';
+      await loadUsers(); // setelah buat user, refresh list
+    } catch (err) {
+      setStatus('userStatus', 'Error: ' + err.message, false);
+    }
+  }
+
+  async function loadUsers() {
+    try {
+      const resp = await fetch(`${GATEWAY_BASE_URL}/api/user-service/users`);
+      const data = await resp.json();
+
+      const list = document.getElementById('userList');
+      list.innerHTML = '';
+
+      if (!Array.isArray(data) || data.length === 0) {
+        list.innerHTML = '<div class="small">Belum ada user.</div>';
+        setLastUpdated('usersUpdatedAt');
+        return;
+      }
+
+      data.forEach(user => {
+        const div = document.createElement('div');
+        div.className = 'user-item' + (selectedUser && selectedUser.id === user.id ? ' active' : '');
+        div.textContent = `#${user.id} - ${user.name} (${user.email}) | Saldo: ${user.balance}`;
+        div.onclick = () => selectUser(user);
+        list.appendChild(div);
+      });
+
+      setLastUpdated('usersUpdatedAt');
+    } catch (err) {
+      document.getElementById('userList').innerHTML =
+        '<div class="small" style="color:red;">Gagal memuat user: ' + err.message + '</div>';
+    }
+  }
+
+  function selectUser(user) {
+    selectedUser = user;
+    document.getElementById('selectedUserLabel').textContent =
+      `#${user.id} - ${user.name}`;
+    document.getElementById('balanceLabel').textContent = user.balance ?? '-';
+    setStatus('balanceStatus', '');
+    setStatus('payStatus', '');
+    loadUsers(); // refresh highlight
+  }
+
+  async function loadBalance() {
+    if (!selectedUser) {
+      setStatus('balanceStatus', 'Pilih user dulu.', false);
+      return;
+    }
+    try {
+      const resp = await fetch(
+        `${GATEWAY_BASE_URL}/api/user-service/users/${selectedUser.id}/balance`
+      );
+      const data = await resp.json();
+      if (!resp.ok) {
+        setStatus('balanceStatus', data.message || 'Gagal cek saldo.', false);
+        return;
+      }
+      document.getElementById('balanceLabel').textContent = data.balance;
+      setStatus('balanceStatus', 'Saldo berhasil diperbarui.', true);
+    } catch (err) {
+      setStatus('balanceStatus', 'Error: ' + err.message, false);
+    }
+  }
+
+  async function topup() {
+    if (!selectedUser) {
+      setStatus('balanceStatus', 'Pilih user dulu.', false);
+      return;
+    }
+    const amount = parseFloat(document.getElementById('topupAmount').value);
+    if (isNaN(amount) || amount <= 0) {
+      setStatus('balanceStatus', 'Nominal top up tidak valid.', false);
+      return;
+    }
+
+    try {
+      const resp = await fetch(
+        `${GATEWAY_BASE_URL}/api/payment-service/transactions/topup`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            user_id: selectedUser.id,
+            amount: amount
+          })
+        }
+      );
+      const data = await resp.json();
+      if (!resp.ok) {
+        setStatus('balanceStatus', data.message || 'Gagal top up.', false);
+        return;
+      }
+      document.getElementById('topupAmount').value = '';
+      await loadBalance();
+      await loadTransactions();
+      setStatus('balanceStatus', 'Top up berhasil.', true);
+    } catch (err) {
+      setStatus('balanceStatus', 'Error: ' + err.message, false);
+    }
+  }
+
+  async function pay() {
+    if (!selectedUser) {
+      setStatus('payStatus', 'Pilih user dulu.', false);
+      return;
+    }
+    const amount = parseFloat(document.getElementById('payAmount').value);
+    const merchant = document.getElementById('merchantInput').value.trim();
+    const note = document.getElementById('noteInput').value.trim();
+
+    if (isNaN(amount) || amount <= 0) {
+      setStatus('payStatus', 'Nominal pembayaran tidak valid.', false);
+      return;
+    }
+    if (!merchant) {
+      setStatus('payStatus', 'Merchant harus diisi.', false);
+      return;
+    }
+
+    try {
+      const resp = await fetch(
+        `${GATEWAY_BASE_URL}/api/payment-service/transactions/pay`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            user_id: selectedUser.id,
+            amount,
+            merchant,
+            note
+          })
+        }
+      );
+      const data = await resp.json();
+      if (!resp.ok) {
+        setStatus('payStatus', data.message || 'Gagal melakukan pembayaran.', false);
+        return;
+      }
+      document.getElementById('payAmount').value = '';
+      document.getElementById('merchantInput').value = '';
+      document.getElementById('noteInput').value = '';
+      await loadBalance();
+      await loadTransactions();
+      setStatus('payStatus', 'Pembayaran berhasil.', true);
+    } catch (err) {
+      setStatus('payStatus', 'Error: ' + err.message, false);
+    }
+  }
+
+  async function loadTransactions() {
+    try {
+      const resp = await fetch(
+        `${GATEWAY_BASE_URL}/api/payment-service/transactions`
+      );
+      const data = await resp.json();
+      const tbody = document.querySelector('#transactionsTable tbody');
+      tbody.innerHTML = '';
+
+      if (!Array.isArray(data) || data.length === 0) {
+        const tr = document.createElement('tr');
+        const td = document.createElement('td');
+        td.colSpan = 5;
+        td.textContent = 'Belum ada transaksi.';
+        tr.appendChild(td);
+        tbody.appendChild(tr);
+        setLastUpdated('transactionsUpdatedAt');
+        return;
+      }
+
+      data.forEach(trx => {
+        const tr = document.createElement('tr');
+
+        const tdId = document.createElement('td');
+        tdId.textContent = trx.id;
+
+        const tdUser = document.createElement('td');
+        tdUser.textContent = trx.user_id;
+
+        const tdType = document.createElement('td');
+        const spanType = document.createElement('span');
+        spanType.textContent = trx.type;
+        spanType.className = 'badge ' + (trx.type === 'topup' ? 'topup' : 'payment');
+        tdType.appendChild(spanType);
+
+        const tdAmount = document.createElement('td');
+        tdAmount.textContent = trx.amount;
+
+        const tdDesc = document.createElement('td');
+        tdDesc.textContent = trx.description || '';
+
+        tr.appendChild(tdId);
+        tr.appendChild(tdUser);
+        tr.appendChild(tdType);
+        tr.appendChild(tdAmount);
+        tr.appendChild(tdDesc);
+
+        tbody.appendChild(tr);
+      });
+
+      setLastUpdated('transactionsUpdatedAt');
+    } catch (err) {
+      const tbody = document.querySelector('#transactionsTable tbody');
+      tbody.innerHTML = '';
+      const tr = document.createElement('tr');
+      const td = document.createElement('td');
+      td.colSpan = 5;
+      td.textContent = 'Gagal memuat transaksi: ' + err.message;
+      td.style.color = 'red';
+      tr.appendChild(td);
+      tbody.appendChild(tr);
+    }
+  }
+
+  // load awal sekali (tidak auto-refresh berkala)
+  loadUsers();
+  loadTransactions();
+</script>
+</body>
+</html>
