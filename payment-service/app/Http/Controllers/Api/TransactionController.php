@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Transaction;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Validator; // untuk validasi manual JSON
 
 class TransactionController extends Controller
 {
@@ -25,12 +26,24 @@ class TransactionController extends Controller
     // POST /api/transactions/topup
     public function topup(Request $request)
     {
-        $data = $request->validate([
+        // 1. VALIDASI MANUAL
+        // Kita pakai Validator facade supaya kalau gagal, return JSON (bukan redirect HTML)
+        $validator = Validator::make($request->all(), [
             'user_id' => 'required|integer',
-            'amount'  => 'required|numeric|min:1',
+            'amount'  => 'required|numeric|min:1', // Mencegah negatif & nol
         ]);
 
-        // Panggil User Service untuk tambah saldo (credit)
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Nominal invalid', // Pesan sesuai request kamu
+                'errors'  => $validator->errors()
+            ], 400);
+        }
+
+        // Ambil data yang sudah tervalidasi
+        $data = $validator->validated();
+
+        // 2. Panggil User Service (credit)
         $response = Http::put(
             $this->userServiceBaseUrl . '/api/internal/users/' . $data['user_id'] . '/balance',
             [
@@ -46,7 +59,7 @@ class TransactionController extends Controller
             ], 400);
         }
 
-        // Simpan transaksi
+        // 3. Simpan transaksi
         $transaction = Transaction::create([
             'user_id'     => $data['user_id'],
             'type'        => 'topup',
@@ -63,14 +76,24 @@ class TransactionController extends Controller
     // POST /api/transactions/pay
     public function pay(Request $request)
     {
-        $data = $request->validate([
+        // 1. VALIDASI MANUAL
+        $validator = Validator::make($request->all(), [
             'user_id'  => 'required|integer',
-            'amount'   => 'required|numeric|min:1',
+            'amount'   => 'required|numeric|min:1', // Mencegah negatif & nol
             'merchant' => 'required|string',
             'note'     => 'nullable|string',
         ]);
 
-        // Cek saldo dulu
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Nominal invalid', // Pesan sesuai request kamu
+                'errors'  => $validator->errors()
+            ], 400);
+        }
+
+        $data = $validator->validated();
+
+        // 2. Cek saldo (Get Balance)
         $balanceResponse = Http::get(
             $this->userServiceBaseUrl . '/api/users/' . $data['user_id'] . '/balance'
         );
@@ -83,13 +106,14 @@ class TransactionController extends Controller
 
         $balanceData = $balanceResponse->json();
 
+        // Cek kecukupan saldo
         if ($balanceData['balance'] < $data['amount']) {
             return response()->json([
                 'message' => 'Insufficient balance',
             ], 400);
         }
 
-        // Kurangi saldo (debit)
+        // 3. Kurangi saldo (debit)
         $updateResponse = Http::put(
             $this->userServiceBaseUrl . '/api/internal/users/' . $data['user_id'] . '/balance',
             [
@@ -105,13 +129,12 @@ class TransactionController extends Controller
             ], 400);
         }
 
-        // Simpan transaksi
+        // 4. Simpan transaksi
         $transaction = Transaction::create([
             'user_id'     => $data['user_id'],
             'type'        => 'payment',
             'amount'      => $data['amount'],
-            'description' => 'Payment to ' . $data['merchant']
-                . (!empty($data['note']) ? ' - ' . $data['note'] : ''),
+            'description' => 'Payment to ' . $data['merchant'] . (!empty($data['note']) ? ' - ' . $data['note'] : ''),
         ]);
 
         return response()->json([
